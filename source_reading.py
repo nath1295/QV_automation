@@ -4,7 +4,7 @@ from oauth2client.client import OAuth2WebServerFlow
 from oauth2client.file import Storage
 from oauth2client.tools import run_flow
 import httplib2
-from cred import gs_api_key,gs_api_secret
+from cred import gs_api_key,gs_api_secret,gs_setup_sheet_id
 
 # Start the OAuth flow to retrieve credentials
 def authorize_credentials():
@@ -25,7 +25,7 @@ def authorize_credentials():
     return credentials
 
 # Global variables
-GGSS_ID = '1o-LHzKv_WWkEpClhNAVljCr76tctO6DY2uSq147wSv0'
+GGSS_ID = gs_setup_sheet_id
 gc = gspread.authorize(authorize_credentials())
 ss = gc.open_by_key(GGSS_ID)
 

@@ -3,12 +3,13 @@ import gspread
 import pandas as pd
 import math
 from datetime import datetime as dt
+from cred import gs_log_sheet
 
 
 
 class GsLogger:
     def __init__(self):
-        self.__ggss = 'https://docs.google.com/spreadsheets/d/1PU4MBKtOzfB6GXe5fDea8QO5G3IzrRUcFgL2TzFXeJk/edit#gid=0'
+        self.__ggss = gs_log_sheet
         self.__gc = gspread.authorize(authorize_credentials())
         self.__ss = self.__gc.open_by_url(self.__ggss)
         self.__log = self.__ss.worksheet('Log')
