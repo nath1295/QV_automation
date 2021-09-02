@@ -126,12 +126,21 @@ class ToolService:
                     upload_files = []
             # upload straigtaway
             else:
-                upload_files = list(map(lambda x: scan['filedate_obj'].str_date(x), rename_patterns))
+                if scan['filedate_obj'].file_date.strftime('%Y%m%d')=='19700101':
+                    upload_files = []
+                    for file in transformed_files:
+                        for pattern in rename_patterns:
+                            if (DatedFile(file,pattern).file_date!='Filename/pattern not matching') & (file not in  upload_files):
+                                upload_files.append(file)
+                else:
+                    upload_files = list(map(lambda x: scan['filedate_obj'].str_date(x), rename_patterns))
             # Actual uploading
             self.__ftp.chdir(task['upload_to'])
             failed_files = []
             for file in upload_files:
                 try:
+                    if file not in transformed_files:
+                        raise RuntimeError(f'{file} not in the output list.')
                     if last_refresh=='live':
                         if task['status']=='live':
                             self.__ftp.upload(file,task['upload_from'])
@@ -141,7 +150,7 @@ class ToolService:
                 log['status'] = 'success/ file(s) not uploaded'
             else:
                 log['status'] = 'success'
-            log['outfile'] = '|'.join(transformed_files)
+            log['outfile'] = '|'.join(upload_files)
         else:
             log['status'] = 'fail'
             log['outfile'] = ''
