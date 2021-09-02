@@ -148,9 +148,11 @@ class ToolService:
                     failed_files.append(file)
             if (len(upload_files)==0|len(failed_files)!=0):
                 log['status'] = 'success/ file(s) not uploaded'
+            elif task['status']=='live/no upload':
+                log['status'] = 'success/ no upload'
             else:
                 log['status'] = 'success'
-            log['outfile'] = '|'.join(upload_files)
+            log['outfile'] = '|'.join(transformed_files)
         else:
             log['status'] = 'fail'
             log['outfile'] = ''
