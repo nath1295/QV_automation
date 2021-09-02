@@ -27,7 +27,7 @@ def ftp_config(host):
     return ftp
 
 
-class Ftp():
+class Ftp:
     '''
     FTP object which can perform basic ftp client operations
     '''

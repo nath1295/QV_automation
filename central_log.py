@@ -3,7 +3,7 @@ import gspread
 import pandas as pd
 import math
 from datetime import datetime as dt
-from cred import gs_log_sheet
+from cred import gs_log_sheet, gs_interactor
 
 
 
@@ -16,16 +16,18 @@ class GsLogger:
         self.__time = self.__ss.worksheet('Time')
 
     def log(self,log_info):
-        # Input File, Output File, FTP, Time, Status, Project
-        self.__log.append_rows([log_info])
+        #  Input Path, Input File, mod timestamp, Output File, FTP, Tool, Time, Status, Project, run status, runtime id
+        keys = ["path","infile","modtime","outfile","ftp","tool","Time","status","pj","run_status","run_id"]
+        log_info = list(map(lambda x: [x[k] for k in keys],log_info))
+        self.__log.append_rows(log_info)
 
-    def log_refresh(self,resfresh_info,mode='live'):
-        self.__time.append_rows([resfresh_info+[mode]],value_input_option='RAW')
+    def log_refresh(self,resfresh_info):
+        self.__time.append_rows(resfresh_info,value_input_option='RAW')
 
-    def last_refresh(self,project,user):
+    def last_refresh(self,project,ftp_host):
         # '12/04/2021 10:50:37'
         data = pd.DataFrame(self.__time.get_all_records())
-        data = data[(data['User']==user) & (data['Project']==project)]
+        data = data[(data['ftp_host']==ftp_host) & (data['Project']==project)]
         data = data[data['mode']=='live']
         time = data['timestamp'].max()
         if math.isnan(time):
@@ -37,9 +39,13 @@ class GsLogger:
         data = self.__log.get_all_records()
         data = pd.DataFrame(data)
         data = data[data['Project']==project]
+        data = data[data['Run Status']=='live']
         data['mod_timestamp'] = data['mod_timestamp'].astype(int)
-        data['filekey'] = data.apply(lambda x: f"{x['Input File']}{x['mod_timestamp']}",axis=1)
-        return data['filekey'].unique()
+        if len(data)!=0:
+            data['filekey'] = data.apply(lambda x: f"{x['Input Path']}/{x['Input File']}{x['mod_timestamp']}",axis=1)
+            return data['filekey'].unique()
+        else:
+            return []
 
     # ['file', 'time', 'type', 'path']
     def newfiles(self,data,project):
@@ -52,21 +58,27 @@ class GsLogger:
         return data
 
     def create_private_log(self,ggss_url):
-        cc = self.__gc.open_by_url(ggss_url)
-        sheets = cc.worksheets()
-        sheets = list(map(lambda x: x.title,sheets))
-        if 'QV automator log' not in sheets:
-            cc.add_worksheet('QV automator log',1,8)
-            header = ["Input File,mod_timestamp,Output File,FTP,Tool,Time,Status,User".split(',')]
-            private = cc.worksheet('QV automator log')
-            private.insert_rows(header)
-        else:
-            private = cc.worksheet('QV automator log')
-        self.__private = private
+        try:
+            cc = self.__gc.open_by_url(ggss_url)
+            sheets = cc.worksheets()
+            sheets = list(map(lambda x: x.title,sheets))
+            if 'QV automator log' not in sheets:
+                cc.add_worksheet('QV automator log',1,8)
+                header = ["Input Path,Input File,mod_timestamp,Output File,FTP,Tool,Time,Status,Run Status,Runtime ID".split(',')]
+                private = cc.worksheet('QV automator log')
+                private.insert_rows(header)
+            else:
+                private = cc.worksheet('QV automator log')
+            self.__private = private
+        except:
+            print(f'Please add "{gs_interactor}" as an editor in the log viewing google spreadsheet [{ggss_url}].')
+            self.__private = 'NA'
 
     def private_log(self,log_info):
-        log_info = log_info[0:-2]+[log_info[-1]]
-        self.__private.insert_rows([log_info],2)
+        if self.__private!='NA':
+            keys = ["path", "infile", "modtime", "outfile", "ftp", "tool", "Time", "status", "run_status","run_id"]
+            log_info = list(map(lambda x: [x[k] for k in keys], log_info))
+            self.__private.insert_rows(log_info,2)
 
     def log_others(self,file_data):
         # [df,ftp,user]
@@ -89,10 +101,4 @@ class GsLogger:
             self.__private.insert_rows(logs,2)
 
 
-if __name__=='__main__':
-    gsl = GsLogger()
-    # gs_logger.log(['asdf.txt','qwer.txt','ftp2','13/04/2021 12:27:48','Fail','Lenovo WE Retail'])
-    data = gsl.private_log(['test2','test3'])
 
-
-    print('done')

@@ -76,7 +76,7 @@ class DatedFile:
         if matches:
             self.file_date_info = list(matches.groups())
             if len(self.date_code)==0:
-                pass
+                self.file_date = dt.strptime('1970-01-01', '%Y-%m-%d')
             elif ('%Y' not in self.date_code) and ('%y' not in self.date_code):
                 self.date_code.append('%Y')
                 self.file_date_info.append(dt.today().strftime('%Y'))

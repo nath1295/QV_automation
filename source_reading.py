@@ -30,36 +30,48 @@ gc = gspread.authorize(authorize_credentials())
 ss = gc.open_by_key(GGSS_ID)
 
 # get all projects for a user
-def get_projects(user):
-    sheet = ss.worksheet('User Register')
+def get_projects():
+    sheet = ss.worksheet('Project Register')
     snames = ss.worksheets()
     snames = list(map(lambda x: x.title,snames))
-    snames.remove('User Register')
+    snames.remove('Project Register')
     info = pd.DataFrame(sheet.get_all_records(), dtype=str)
-    info = info[info['User']==user]
-
+    info = info[info['Switch']=='on']
     pjs = list(info['Project'])
-    if len(pjs)==0:
-        return 'no project',300
-    elif pjs[0] not in snames:
-        return 'project does not exist',pjs[0]
+    pjs = list(filter(lambda x: x in snames,pjs))
+    return pjs
+
+
+def project_info(project):
+    sheet = ss.worksheet('Project Register')
+    info = pd.DataFrame(sheet.get_all_records(), dtype=str)
+    info = info[info['Project']==project]
+    if len(info)>1:
+        raise RuntimeError('More than one setting for the project.')
+    elif len(info)==1:
+        return info['tool interval (min)'].iloc[0],info['Project Log ggss'].iloc[0]
     else:
-        return pjs[0],info[info['Project']==pjs[0]]['tool interval (min)'].iloc[0],info[info['Project']==pjs[0]]['Project Log ggss'].iloc[0]
+        raise RuntimeError('Project setting does not exist')
+
 
 def tl_data(sheet_name):
     # get project sheet
     sheet = ss.worksheet(sheet_name)
-    users = pd.read_csv('ftp_credentials.csv', index_col='host')['user'].unique()
     tool_data = pd.DataFrame(sheet.get_all_records(),dtype=str)
-    tool_data = tool_data[tool_data['owner'].isin(users)]
-    tool_data['download_to'] = tool_data['download_to'].apply(lambda x: x[:-1] if x[-1]=='\\' else x)
-    tool_data['upload_from'] = tool_data['upload_from'].apply(lambda x: x[:-1] if x[-1]=='\\' else x)
-    tool_data['download_from'] = tool_data['download_from'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
-    tool_data['upload_to'] = tool_data['upload_to'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
-    tool_data  = tool_data.fillna('')
-    tool_data['day_shifting'] = tool_data['day_shifting'].apply(lambda x: '0' if x=='' else x)
-    tool_data['download_dir_clear'] = tool_data['download_dir_clear'].apply(lambda x: 'Yes' if x=='' else x)
-    tool_data['report_range'] = tool_data.apply(report_range, axis=1)
+    tool_data = tool_data[(tool_data['status']=='live') | (tool_data['status']=='live/no upload')]
+    if len(tool_data)!=0:
+        local_paths = ['download_to','upload_from','tool_dir']
+        for col in local_paths:
+            tool_data[col] = tool_data[col].apply(lambda x: x.replace('\\\\fsctx\\','\\\\147.114.32.186\\'))
+        tool_data['download_to'] = tool_data['download_to'].apply(lambda x: x[:-1] if x[-1]=='\\' else x)
+        tool_data['upload_from'] = tool_data['upload_from'].apply(lambda x: x[:-1] if x[-1]=='\\' else x)
+        tool_data['download_from'] = tool_data['download_from'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
+        tool_data['upload_to'] = tool_data['upload_to'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
+        tool_data  = tool_data.fillna('')
+        tool_data['download_file_backup'] = tool_data['download_file_backup'].apply(lambda x: True if x == 'Yes' else False)
+        tool_data['day_shifting'] = tool_data['day_shifting'].apply(lambda x: '0' if x=='' else x)
+        tool_data['download_dir_clear'] = tool_data['download_dir_clear'].apply(lambda x: 'Yes' if x=='' else x)
+        tool_data['report_range'] = tool_data.apply(report_range, axis=1)
     return tool_data
 
 def report_range(x):
@@ -103,12 +115,28 @@ def check_dup(x,dup_list):
         err=err[1:]
     return err
 
+def output_upload(x):
+    if x['output_filename'] !='':
+        if len(x['output_filename'].split('|'))!=len(x['upload_filename_pattern'].split('|')):
+            err = 'Number of output filenames and number of uplaod filename patterns not matching'
+        else:
+            err = ''
+    else:
+        err = ''
+    old = x['errors'].split(',')
+    old.append(err)
+    err = old
+    err = list(filter(lambda y: y!='',err))
+    err = ','.join(err)
+    return err
+
 def check(tool_data):
     checker = tool_data.copy()
     checker['errors'] = checker.apply(out_num_check,axis=1)
     checker['tool_key'] = checker.apply(tool_key,axis=1)
     duplicate = duplicates(checker)
     checker['errors'] = checker.apply(lambda x: check_dup(x,duplicate),axis=1)
+    checker['errors'] = checker.apply(lambda x: output_upload(x), axis=1)
     checker = checker[checker['errors']!='']
     checker = checker[['source_name','tool_name','errors']]
     checker['errors'] = checker.apply(lambda x: f"{x['source_name']} [{x['tool_name']}]: {x['errors']}",axis=1)
