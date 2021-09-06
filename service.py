@@ -6,13 +6,15 @@ from datetime import datetime as dt, timedelta as delt
 from pathlib import Path
 from zipfile import ZipFile
 import pandas as pd
+import shutil
 
 # Project modules
 from central_log import GsLogger
 from filename_pattern import DatedFile
-from ftp import Ftp, ftp_config, get_ftp_user
+from ftp import Ftp
 from source_reading import tl_data, check, get_projects,project_info
 from cred import ftps
+from script_compile import run_script
 
 warnings.filterwarnings('ignore')
 
@@ -47,7 +49,8 @@ class ToolService:
         run_confirm = True
         try:
             self.__create_temp_folder(task['download_to'],file_format,task['download_dir_clear'])
-        except:
+        except Exception as e:
+            print(e)
             run_confirm = False
 
         logs = []
@@ -56,8 +59,9 @@ class ToolService:
                 row = scan.iloc[i]
                 try:
                     logs.append(self.__process_file(row,task,logdict,last_refresh,runtime_id))
-                except:
-                    pass
+                except Exception as e:
+                    print(e)
+            self.__delete_temp_folder(task['download_to'],task['download_dir_clear'])
 
         self.__gslogger.log(logs)
         processed_files = list(map(lambda x: f"{x['path']}/{x['infile']}{x['modtime']}",logs))
@@ -85,6 +89,13 @@ class ToolService:
                 success=False
             os.remove('return.txt')
             os.remove('temp.txt')
+        elif task['tool_type']=='Python':
+            run_time = dt.now()
+            try:
+                success = run_script(task['tool_name'],task['tool_dir'])
+            except:
+                success = False
+
         else:
             # For other transformation method under development
             run_time = dt.now()
@@ -172,7 +183,7 @@ class ToolService:
                 except:
                     raise RuntimeError(f'{file} already exist in temporary folder.')
 
-    def __delete_temp_folder(self,path,file_format,clear_path):
+    def __delete_temp_folder(self,path,clear_path):
         if clear_path == 'Yes':
             inv = os.listdir(path+'\\temp_for_qv_trans')
             for file in inv:
@@ -180,7 +191,7 @@ class ToolService:
                     os.rename(f"{path}\\temp_for_qv_trans\\{file}",f"{path}\\{file}")
                 except:
                     print(f'{file} already copied.')
-            Path(f"{path}\\temp_for_qv_trans").rmdir()
+            shutil.rmtree(f"{path}\\temp_for_qv_trans")
 
 
 
@@ -192,15 +203,9 @@ class ProjectManager:
         self.__tools = tl_data(project)
         checker = check(self.__tools)
         if len(checker) != 0:
-            for err in checker['errors']:
-                print(err)
-            print('please correct the setting spreadsheet before running the QV automator.')
-            time.sleep(300)
-            exit()
+            raise RuntimeError('please correct the setting spreadsheet before running the QV automator.')
         if len(self.__tools) == 0:
-            print(f'You are not the owner of any tools for [{project}] on QV automator.')
-            time.sleep(300)
-            exit()
+            raise RuntimeError(f'There are no active tools for [{project}] on QV automator.')
         self.__interval,self.__privategs = project_info(self.__project)
 
         self.__gslog = GsLogger()
@@ -211,16 +216,16 @@ class ProjectManager:
             else:
                 self.__private_log = False
         except:
-            print(
-                'There is an issue with the log ggss link you provided, please check [User register] tab in the set up')
-            time.sleep(300)
-            exit()
+            raise RuntimeError(
+                'There is an issue with the log ggss link you provided, please check [Project register] tab in the set up')
+
 
     def tools_manage(self,last_refresh='live'):
         runtime_id = self.runtime_id
         # find new files
         scans = []
         time_log_list = list()
+        file_log_list = list()
         for host in self.__tools['ftp_host'].unique():
             ftp = Ftp(host,ftps[host]['port'],ftps[host]['sftp'],ftps[host]['user'],ftps[host]['password'])
             tools = self.__tools[self.__tools
@@ -263,6 +268,7 @@ class ProjectManager:
                 tool_logs = tool_logs + toolflow.loaded_log
                 proced = proced + toolflow.unprocessed
             time_log_list.append(new_time_log)
+            file_log_list = file_log_list + tool_logs.copy()
             details = newfiles
             details['pj'] = self.__project
             details['run_status'] = last_refresh
@@ -272,7 +278,9 @@ class ProjectManager:
             scans.append(details)
         self.__gslog.log_refresh(time_log_list)
         scans = pd.concat(scans)
-        private_logs = tool_logs
+        private_logs = file_log_list.copy()
+        pro_files = list(map(lambda x: f'{x["infile"]}{x["modtime"]}{x["path"]}{x["ftp"]}',private_logs))
+        pro_files = list(set(pro_files))
         if len(scans)!=0:
             scans['keys'] = scans.apply(lambda y: f"{y['path']}/{y['file']}{int(y['time'].timestamp())}",axis=1)
             scans['processed'] = scans['keys'].apply(lambda x: x in proced)
@@ -284,7 +292,7 @@ class ProjectManager:
             private_logs = private_logs + unpro
         if self.__private_log:
             self.__gslog.private_log(private_logs)
-        print(f"{self.__project}: {len(scans)} new files; {len(tool_logs)} files attempted proccessing.")
+        print(f"{self.__project}: {len(scans)} new files; {len(pro_files)} files attempted proccessing.")
         return scans
 
     def get_rumtime_id(self):
@@ -363,8 +371,11 @@ class Scheduler:
             time.sleep(time_dif)
         run_status = 'live'
         try:
+            start = time.perf_counter()
             project = ProjectManager(pj)
             files = project.tools_manage(last_refresh=run_status)
+            end = time.perf_counter()-start
+            print(f'Time taken: {round(end,2)} seconds')
         except Exception as e:
             import traceback
             print(f'[{pj}] failed.')

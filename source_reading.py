@@ -70,6 +70,7 @@ def tl_data(sheet_name):
         tool_data  = tool_data.fillna('')
         tool_data['download_file_backup'] = tool_data['download_file_backup'].apply(lambda x: True if x == 'Yes' else False)
         tool_data['day_shifting'] = tool_data['day_shifting'].apply(lambda x: '0' if x=='' else x)
+        tool_data['tool_type'] = tool_data['tool_type'].apply(lambda x: 'QV' if x == '' else x)
         tool_data['download_dir_clear'] = tool_data['download_dir_clear'].apply(lambda x: 'Yes' if x=='' else x)
         tool_data['report_range'] = tool_data.apply(report_range, axis=1)
     return tool_data
@@ -132,20 +133,19 @@ def output_upload(x):
 
 def check(tool_data):
     checker = tool_data.copy()
-    checker['errors'] = checker.apply(out_num_check,axis=1)
-    checker['tool_key'] = checker.apply(tool_key,axis=1)
-    duplicate = duplicates(checker)
-    checker['errors'] = checker.apply(lambda x: check_dup(x,duplicate),axis=1)
-    checker['errors'] = checker.apply(lambda x: output_upload(x), axis=1)
-    checker = checker[checker['errors']!='']
-    checker = checker[['source_name','tool_name','errors']]
-    checker['errors'] = checker.apply(lambda x: f"{x['source_name']} [{x['tool_name']}]: {x['errors']}",axis=1)
+    if len(checker)!=0:
+        checker['errors'] = checker.apply(out_num_check,axis=1)
+        checker['tool_key'] = checker.apply(tool_key,axis=1)
+        duplicate = duplicates(checker)
+        checker['errors'] = checker.apply(lambda x: check_dup(x,duplicate),axis=1)
+        checker['errors'] = checker.apply(lambda x: output_upload(x), axis=1)
+        checker = checker[checker['errors']!='']
+        if len(checker)!=0:
+            checker = checker[['source_name','tool_name','errors']]
+            checker['errors'] = checker.apply(lambda x: f"{x['source_name']} [{x['tool_name']}]: {x['errors']}",axis=1)
     return checker
 
 
 
-if __name__=='__main__':
-    tool_data = tl_data('Lenovo West Retail')
-    proj = get_projects('ntam')
-    print('done')
+
 

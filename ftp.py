@@ -74,7 +74,7 @@ class Ftp:
             self.conn.chdir(dir)
             self.dir = dir
         except:
-            print(f'No such directory as "{dir}"')
+            print(f'Cannot access directory "{dir}"')
 
     def close(self):
         '''
