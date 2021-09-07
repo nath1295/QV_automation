@@ -44,6 +44,7 @@ def run_script(tool, path):
     # Thread that host the python running workflow
     multiprocessing.freeze_support()
     return_dict = dict()
+    print(f'start running tool "{tool}"')
     success = True
     copytree(path, 'python_temp')
     p = multiprocessing.Process(target=loading_py(tool, path, return_dict))

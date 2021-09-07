@@ -18,6 +18,14 @@ from script_compile import run_script
 
 warnings.filterwarnings('ignore')
 
+def f_rename(src,dst):
+    try:
+        os.rename(src, dst)
+    except:
+        os.remove(dst)
+        os.rename(src, dst)
+
+
 class ToolService:
     '''Manager of a tool in a project'''
     def __init__(self,project,tool,newfiles,last_refresh,runtime_id):
@@ -130,9 +138,14 @@ class ToolService:
                 static_names = task['output_filename'].split('|')
                 if set(transformed_files)==set(static_names):
                     renamed_files = list(map(lambda x: scan['filedate_obj'].str_date(x),rename_patterns))
+                    upload_files = []
                     for i in range(len(static_names)):
-                        os.rename(f"{task['upload_from']}\\{static_names[i]}",f"{task['upload_from']}\\{renamed_files[i]}")
-                    upload_files = renamed_files
+                        try:
+                            f_rename(f"{task['upload_from']}\\{static_names[i]}",f"{task['upload_from']}\\{renamed_files[i]}")
+                            upload_files.append(renamed_files[i])
+                        except:
+                            print(f'failed renaming "{static_names[i]}" to "{renamed_files[i]}"')
+                    transformed_files = upload_files.copy()
                 else:
                     upload_files = []
             # upload straigtaway
@@ -141,7 +154,7 @@ class ToolService:
                     upload_files = []
                     for file in transformed_files:
                         for pattern in rename_patterns:
-                            if (DatedFile(file,pattern).file_date!='Filename/pattern not matching') & (file not in  upload_files):
+                            if (DatedFile(file,pattern).file_date!='Filename/pattern not matching') & (file not in upload_files):
                                 upload_files.append(file)
                 else:
                     upload_files = list(map(lambda x: scan['filedate_obj'].str_date(x), rename_patterns))
@@ -151,7 +164,7 @@ class ToolService:
             for file in upload_files:
                 try:
                     if file not in transformed_files:
-                        raise RuntimeError(f'{file} not in the output list.')
+                        raise RuntimeError(f'"{file}" not in the transformed list')
                     if last_refresh=='live':
                         if task['status']=='live':
                             self.__ftp.upload(file,task['upload_from'])
