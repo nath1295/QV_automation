@@ -68,7 +68,7 @@ def tl_data(sheet_name):
         tool_data['download_from'] = tool_data['download_from'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
         tool_data['upload_to'] = tool_data['upload_to'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
         tool_data  = tool_data.fillna('')
-        tool_data['download_file_backup'] = tool_data['download_file_backup'].apply(lambda x: True if x == 'Yes' else False)
+        tool_data['download_file_backup'] = tool_data['download_file_backup'].apply(lambda x: True if (x in ['Yes','']) else False)
         tool_data['day_shifting'] = tool_data['day_shifting'].apply(lambda x: '0' if x=='' else x)
         tool_data['tool_type'] = tool_data['tool_type'].apply(lambda x: 'QV' if x == '' else x)
         tool_data['download_dir_clear'] = tool_data['download_dir_clear'].apply(lambda x: 'Yes' if x=='' else x)
@@ -119,7 +119,7 @@ def check_dup(x,dup_list):
 def output_upload(x):
     if x['output_filename'] !='':
         if len(x['output_filename'].split('|'))!=len(x['upload_filename_pattern'].split('|')):
-            err = 'Number of output filenames and number of uplaod filename patterns not matching'
+            err = 'Number of output filenames and number of upload filename patterns not matching'
         else:
             err = ''
     else:

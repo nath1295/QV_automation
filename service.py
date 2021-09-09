@@ -75,8 +75,6 @@ class ToolService:
         processed_files = list(map(lambda x: f"{x['path']}/{x['infile']}{x['modtime']}",logs))
         return processed_files,logs
 
-
-
     def __process_file(self,scan,task,logdict,last_refresh,runtime_id):
         file = scan['file']
         log = logdict
@@ -157,7 +155,14 @@ class ToolService:
                             if (DatedFile(file,pattern).file_date!='Filename/pattern not matching') & (file not in upload_files):
                                 upload_files.append(file)
                 else:
-                    upload_files = list(map(lambda x: scan['filedate_obj'].str_date(x), rename_patterns))
+                    # upload_files = list(map(lambda x: scan['filedate_obj'].str_date(x), rename_patterns))
+                    upload_files = []
+                    for file in transformed_files:
+                        for pattern in rename_patterns:
+                            f_date = DatedFile(file,pattern).file_date
+                            if (DatedFile(file,pattern).file_date!='Filename/pattern not matching') & (file not in upload_files):
+                                if f_date==scan['filedate_obj'].file_date:
+                                    upload_files.append(file)
             # Actual uploading
             self.__ftp.chdir(task['upload_to'])
             failed_files = []

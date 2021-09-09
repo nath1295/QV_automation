@@ -8,7 +8,6 @@ gs_setup_sheet_id = 'sample_id_2'
 gs_interactor = 'maintainer@email.com'
 
 # ftp_credentials
-import json
 ftps = {
     "ftphost1": {
         "user":"user1",
