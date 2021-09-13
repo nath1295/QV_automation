@@ -67,6 +67,8 @@ def tl_data(sheet_name):
         tool_data['upload_from'] = tool_data['upload_from'].apply(lambda x: x[:-1] if x[-1]=='\\' else x)
         tool_data['download_from'] = tool_data['download_from'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
         tool_data['upload_to'] = tool_data['upload_to'].apply(lambda x: x[:-1] if x[-1]=='/' else x)
+        tool_data['download_from'] = tool_data['download_from'].apply(lambda x: x.replace('/Noneu','/Non-EU/'))
+        tool_data['upload_to'] = tool_data['upload_to'].apply(lambda x: x.replace('/Noneu', '/Non-EU/'))
         tool_data  = tool_data.fillna('')
         tool_data['download_file_backup'] = tool_data['download_file_backup'].apply(lambda x: True if (x in ['Yes','']) else False)
         tool_data['day_shifting'] = tool_data['day_shifting'].apply(lambda x: '0' if x=='' else x)
@@ -130,6 +132,12 @@ def output_upload(x):
     err = list(filter(lambda y: y!='',err))
     err = ','.join(err)
     return err
+
+def check_same_io_fname(x):
+    er = x['errors']
+    new = ''
+    if (x['download_filename']==x['upload_filename_pattern']) & (x['tool_type']=='Renaming'):
+        new = 'input and output filename pattern identical'
 
 def check(tool_data):
     checker = tool_data.copy()
