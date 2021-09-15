@@ -138,6 +138,15 @@ def check_same_io_fname(x):
     new = ''
     if (x['download_filename']==x['upload_filename_pattern']) & (x['tool_type']=='Renaming'):
         new = 'input and output filename pattern identical'
+    if (er=='') & (new==''):
+        final = ''
+    elif (er==''):
+        final = new
+    elif (new==''):
+        final = er
+    else:
+        final = er+','+new
+    return final
 
 def check(tool_data):
     checker = tool_data.copy()
@@ -147,6 +156,7 @@ def check(tool_data):
         duplicate = duplicates(checker)
         checker['errors'] = checker.apply(lambda x: check_dup(x,duplicate),axis=1)
         checker['errors'] = checker.apply(lambda x: output_upload(x), axis=1)
+        checker['errors'] = checker.apply(lambda x: check_same_io_fname(x), axis=1)
         checker = checker[checker['errors']!='']
         if len(checker)!=0:
             checker = checker[['source_name','tool_name','errors']]

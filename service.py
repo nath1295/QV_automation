@@ -79,6 +79,7 @@ class ToolService:
         file = scan['file']
         log = logdict
         # download the file
+        self.__ftp.chdir(task['download_from'])
         self.__ftp.download(file,task['download_to'])
         # run transformation tool
         if task['tool_type']=='QV':
@@ -99,6 +100,16 @@ class ToolService:
             run_time = dt.now()
             try:
                 success = run_script(task['tool_name'],task['tool_dir'])
+            except:
+                success = False
+        elif task['tool_type']=='Renaming':
+            run_time = dt.now()
+            time.sleep(0.5)
+            success = True
+            try:
+                new_file = scan['filedate_obj'].str_date(task['upload_filename_pattern'])
+                print(f'Renaming file "{file}" to "{new_file}"')
+                shutil.copyfile(f"{task['download_to']}\\{file}",f"{task['upload_from']}\\{new_file}")
             except:
                 success = False
 
@@ -159,10 +170,8 @@ class ToolService:
                     upload_files = []
                     for file in transformed_files:
                         for pattern in rename_patterns:
-                            f_date = DatedFile(file,pattern).file_date
-                            if (DatedFile(file,pattern).file_date!='Filename/pattern not matching') & (file not in upload_files):
-                                if f_date==scan['filedate_obj'].file_date:
-                                    upload_files.append(file)
+                            if (scan['filedate_obj'].output_matching(file,pattern)) & (file not in upload_files):
+                                upload_files.append(file)
             # Actual uploading
             self.__ftp.chdir(task['upload_to'])
             failed_files = []
@@ -175,7 +184,8 @@ class ToolService:
                             self.__ftp.upload(file,task['upload_from'])
                 except:
                     failed_files.append(file)
-            if (len(upload_files)==0|len(failed_files)!=0):
+
+            if ((len(upload_files)==0)|(len(failed_files)!=0)):
                 log['status'] = 'success/ file(s) not uploaded'
             elif task['status']=='live/no upload':
                 log['status'] = 'success/ no upload'
@@ -303,11 +313,12 @@ class ProjectManager:
             scans['keys'] = scans.apply(lambda y: f"{y['path']}/{y['file']}{int(y['time'].timestamp())}",axis=1)
             scans['processed'] = scans['keys'].apply(lambda x: x in proced)
             unpro = scans[scans['processed']==False]
-            unpro['Time'] = dt.now().strftime('%d/%m/%Y %H:%M:%S')
-            unpro['log'] = unpro.apply(file_log_creation,axis=1)
-            unpro = list(unpro['log'].values)
-            self.__gslog.log(unpro)
-            private_logs = private_logs + unpro
+            if len(unpro)!=0:
+                unpro['Time'] = dt.now().strftime('%d/%m/%Y %H:%M:%S')
+                unpro['log'] = unpro.apply(file_log_creation,axis=1)
+                unpro = list(unpro['log'].values)
+                self.__gslog.log(unpro)
+                private_logs = private_logs + unpro
         if self.__private_log:
             self.__gslog.private_log(private_logs)
         print(f"{self.__project}: {len(scans)} new files; {len(pro_files)} files attempted proccessing.")
