@@ -295,7 +295,7 @@ class ProjectManager:
                 toolflow = ToolService(self.__project,tool,newfiles,last_refresh,runtime_id)
                 tool_logs = tool_logs + toolflow.loaded_log
                 proced = proced + toolflow.unprocessed
-            time_log_list.append(new_time_log)
+            self.__gslog.log_refresh([new_time_log])
             file_log_list = file_log_list + tool_logs.copy()
             details = newfiles
             details['pj'] = self.__project
@@ -304,7 +304,6 @@ class ProjectManager:
             details['modtime'] = details['time'].apply(lambda x: str(int(x.timestamp())))
             details['run_id'] = str(runtime_id)
             scans.append(details)
-        self.__gslog.log_refresh(time_log_list)
         scans = pd.concat(scans)
         private_logs = file_log_list.copy()
         pro_files = list(map(lambda x: f'{x["infile"]}{x["modtime"]}{x["path"]}{x["ftp"]}',private_logs))
@@ -394,7 +393,8 @@ class Scheduler:
         pj = next['project']
         time_dif = next['timestamp']-dt.now().timestamp()
         if time_dif<=0:
-            print(f'next project [{pj}] running in 0 seconds.')
+            print(f'next project [{pj}] running in 100 seconds.')
+            time.sleep(100)
         else:
             print(f'next project [{pj}] running in {time_dif} seconds.')
             time.sleep(time_dif)
@@ -442,7 +442,7 @@ class Scheduler:
             pass
 
 if __name__=='__main__':
-    project = ProjectManager('Sample project')
+    project = ProjectManager('Lenovo APAC')
     files = project.tools_manage(last_refresh='test')
 
     print('done')
